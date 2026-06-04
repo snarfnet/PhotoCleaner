@@ -133,6 +133,19 @@ struct ContentView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
 
+            Button {
+                service.cancelScan()
+            } label: {
+                Label("キャンセル", systemImage: "xmark.circle")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.red)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 10)
+                    .background(Color.red.opacity(0.1))
+                    .clipShape(Capsule())
+            }
+            .padding(.top, 4)
+
             Spacer()
         }
     }

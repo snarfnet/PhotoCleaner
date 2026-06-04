@@ -9,6 +9,7 @@ class PhotoScanService: ObservableObject {
     @Published var progress: Double = 0
     @Published var scanResult: ScanResult?
     @Published var selectedForDeletion: Set<String> = []
+    private var currentToken: ScanCancellationToken?
 
     enum ScanState {
         case idle
@@ -29,6 +30,9 @@ class PhotoScanService: ObservableObject {
     }()
 
     func startScan() {
+        currentToken?.cancel()
+        let token = ScanCancellationToken()
+        currentToken = token
         scanState = .requesting
         progress = 0
         scanResult = nil
@@ -39,8 +43,12 @@ class PhotoScanService: ObservableObject {
                 guard let self else { return }
                 switch status {
                 case .authorized, .limited:
+                    guard !token.isCancelled else {
+                        self.resetAfterCancellation(token)
+                        return
+                    }
                     self.scanState = .scanning
-                    await self.performScan()
+                    await self.performScan(token: token)
                 default:
                     self.scanState = .error("写真ライブラリへのアクセスが許可されていません。設定からアクセスを許可してください。")
                 }
@@ -48,30 +56,58 @@ class PhotoScanService: ObservableObject {
         }
     }
 
-    private func performScan() async {
+    func cancelScan() {
+        currentToken?.cancel()
+        resetAfterCancellation(currentToken)
+    }
+
+    private func resetAfterCancellation(_ token: ScanCancellationToken?) {
+        guard token == nil || token === currentToken else { return }
+        progress = 0
+        scanState = .idle
+        currentToken = nil
+    }
+
+    private func performScan(token: ScanCancellationToken) async {
         let fetchOptions = PHFetchOptions()
         fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         let allPhotos = PHAsset.fetchAssets(with: .image, options: fetchOptions)
         let totalCount = allPhotos.count
 
-        guard totalCount > 1 else {
-            scanResult = ScanResult(groups: [])
-            scanState = .done
+        guard !token.isCancelled else {
+            resetAfterCancellation(token)
             return
         }
 
-        let prints = await buildFeaturePrints(from: allPhotos, totalCount: totalCount)
+        guard totalCount > 1 else {
+            scanResult = ScanResult(groups: [])
+            scanState = .done
+            currentToken = nil
+            return
+        }
+
+        let prints = await buildFeaturePrints(from: allPhotos, totalCount: totalCount, token: token)
+        guard !token.isCancelled else {
+            resetAfterCancellation(token)
+            return
+        }
         progress = 0.8
 
-        let groups = await groupSimilarPhotos(prints)
+        let groups = await groupSimilarPhotos(prints, token: token)
+        guard !token.isCancelled else {
+            resetAfterCancellation(token)
+            return
+        }
         progress = 1.0
         scanResult = ScanResult(groups: groups)
         scanState = .done
+        currentToken = nil
     }
 
     private func buildFeaturePrints(
         from allPhotos: PHFetchResult<PHAsset>,
-        totalCount: Int
+        totalCount: Int,
+        token: ScanCancellationToken
     ) async -> [(PHAsset, VNFeaturePrintObservation)] {
         await withCheckedContinuation { continuation in
             Task.detached { [weak self] in
@@ -84,6 +120,7 @@ class PhotoScanService: ObservableObject {
                 let targetSize = CGSize(width: 224, height: 224)
 
                 for index in 0..<totalCount {
+                    guard !token.isCancelled else { break }
                     let asset = allPhotos.object(at: index)
                     guard let image = self.thumbnailForScan(asset: asset, targetSize: targetSize),
                           let cgImage = image.cgImage else {
@@ -101,7 +138,9 @@ class PhotoScanService: ObservableObject {
                     if index % 10 == 0 {
                         let currentProgress = Double(index) / Double(totalCount) * 0.8
                         Task { @MainActor in
-                            self.progress = currentProgress
+                            if !token.isCancelled {
+                                self.progress = currentProgress
+                            }
                         }
                     }
                 }
@@ -131,7 +170,8 @@ class PhotoScanService: ObservableObject {
     }
 
     private func groupSimilarPhotos(
-        _ prints: [(PHAsset, VNFeaturePrintObservation)]
+        _ prints: [(PHAsset, VNFeaturePrintObservation)],
+        token: ScanCancellationToken
     ) async -> [SimilarGroup] {
         await withCheckedContinuation { continuation in
             Task.detached {
@@ -140,6 +180,7 @@ class PhotoScanService: ObservableObject {
                 let candidateThreshold: Float = 0.52
 
                 for index in prints.indices {
+                    guard !token.isCancelled else { break }
                     guard !used.contains(index) else { continue }
 
                     var groupAssets = [prints[index].0]
@@ -147,6 +188,7 @@ class PhotoScanService: ObservableObject {
                     used.insert(index)
 
                     for candidateIndex in prints.indices where candidateIndex > index {
+                        guard !token.isCancelled else { break }
                         guard !used.contains(candidateIndex) else { continue }
 
                         var distance: Float = 0
@@ -187,7 +229,7 @@ class PhotoScanService: ObservableObject {
                     }
                     return $0.averageDistance < $1.averageDistance
                 }
-                continuation.resume(returning: groups)
+                continuation.resume(returning: token.isCancelled ? [] : groups)
             }
         }
     }
@@ -270,6 +312,23 @@ class PhotoScanService: ObservableObject {
         let favoriteBonus = asset.isFavorite ? 100 : 0
         let recentBonus = (asset.creationDate?.timeIntervalSince1970 ?? 0) / 10_000_000_000
         return Double(favoriteBonus) + pixels + recentBonus
+    }
+}
+
+private final class ScanCancellationToken: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelled
+    }
+
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
     }
 }
 

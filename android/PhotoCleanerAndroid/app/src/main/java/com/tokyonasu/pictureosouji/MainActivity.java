@@ -43,6 +43,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_READ_IMAGES = 100;
@@ -54,6 +55,8 @@ public class MainActivity extends Activity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ArrayList<PhotoGroup> groups = new ArrayList<>();
     private final Set<Uri> selectedForDeletion = new HashSet<>();
+    private volatile boolean scanCancelled = false;
+    private Future<?> scanFuture;
 
     private FrameLayout root;
     private LinearLayout progressBox;
@@ -135,15 +138,28 @@ public class MainActivity extends Activity {
     }
 
     private void scanPhotos() {
+        scanCancelled = false;
         showProgress();
-        executor.execute(() -> {
+        scanFuture = executor.submit(() -> {
             ArrayList<PhotoItem> photos = loadPhotoItems();
+            if (scanCancelled || Thread.currentThread().isInterrupted()) return;
             postProgress(45, "特徴を見ています");
             ArrayList<PhotoGroup> result = buildGroups(photos);
+            if (scanCancelled || Thread.currentThread().isInterrupted()) return;
             groups.clear();
             groups.addAll(result);
             mainHandler.post(this::showResults);
         });
+    }
+
+    private void cancelScan() {
+        scanCancelled = true;
+        if (scanFuture != null) {
+            scanFuture.cancel(true);
+            scanFuture = null;
+        }
+        Toast.makeText(this, "スキャンをキャンセルしました。", Toast.LENGTH_SHORT).show();
+        showHome();
     }
 
     private ArrayList<PhotoItem> loadPhotoItems() {
@@ -180,7 +196,10 @@ public class MainActivity extends Activity {
 
             int count = cursor.getCount();
             int index = 0;
-            while (cursor.moveToNext() && index < MAX_SCAN_COUNT) {
+            while (!scanCancelled
+                    && !Thread.currentThread().isInterrupted()
+                    && cursor.moveToNext()
+                    && index < MAX_SCAN_COUNT) {
                 long id = cursor.getLong(idCol);
                 Uri uri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, String.valueOf(id));
                 Bitmap thumbnail = loadThumbnail(uri);
@@ -224,7 +243,9 @@ public class MainActivity extends Activity {
         for (int i = 0; i < n; i++) parent[i] = i;
 
         for (int i = 0; i < n; i++) {
+            if (scanCancelled || Thread.currentThread().isInterrupted()) return new ArrayList<>();
             for (int j = i + 1; j < n; j++) {
+                if (scanCancelled || Thread.currentThread().isInterrupted()) return new ArrayList<>();
                 int distance = Long.bitCount(photos.get(i).hash ^ photos.get(j).hash);
                 if (distance <= SIMILAR_THRESHOLD) {
                     int rootA = find(parent, i);
@@ -340,12 +361,20 @@ public class MainActivity extends Activity {
         box.addView(progressBar, barParams);
         box.addView(note);
 
+        Button cancel = secondaryButton("キャンセル");
+        cancel.setTextColor(Color.RED);
+        cancel.setOnClickListener(v -> cancelScan());
+        LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(-1, dp(50));
+        cancelParams.setMargins(0, dp(22), 0, 0);
+        box.addView(cancel, cancelParams);
+
         progressBox = box;
         root.addView(box, new FrameLayout.LayoutParams(-1, -1));
     }
 
     private void postProgress(int percent, String label) {
         mainHandler.post(() -> {
+            if (scanCancelled) return;
             if (progressBar != null) progressBar.setProgress(percent);
             if (progressText != null) progressText.setText(label + "  " + percent + "%");
         });
