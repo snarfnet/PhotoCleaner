@@ -3,3 +3,6 @@
 DerivedData/
 build/
 .build/
+.gradle/
+android/**/.gradle/
+android/**/build/
