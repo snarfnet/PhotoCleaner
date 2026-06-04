@@ -3,20 +3,13 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var service = PhotoScanService()
 
-    // Cute pastel colors
-    private let bgGradient = LinearGradient(
-        colors: [
-            Color(red: 1.0, green: 0.95, blue: 0.97),
-            Color(red: 0.95, green: 0.95, blue: 1.0)
-        ],
-        startPoint: .top, endPoint: .bottom
-    )
-    private let accentPink = Color(red: 1.0, green: 0.5, blue: 0.6)
+    private let accentBlue = Color(red: 0.04, green: 0.33, blue: 0.72)
+    private let accentGreen = Color(red: 0.06, green: 0.52, blue: 0.36)
 
     var body: some View {
         NavigationStack {
             ZStack {
-                bgGradient.ignoresSafeArea()
+                background
 
                 switch service.scanState {
                 case .idle, .requesting:
@@ -29,114 +22,157 @@ struct ContentView: View {
                     } else {
                         noResultView
                     }
-                case .error(let msg):
-                    errorView(msg)
+                case .error(let message):
+                    errorView(message)
                 }
             }
-            .navigationTitle("写真おそうじ")
+            .navigationTitle("ピクチャおそうじ")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
 
-    // MARK: - Idle
+    private var background: some View {
+        ZStack {
+            if case .idle = service.scanState {
+                Image("top_background")
+                    .resizable()
+                    .scaledToFill()
+                    .ignoresSafeArea()
+
+                LinearGradient(
+                    colors: [
+                        .black.opacity(0.1),
+                        .black.opacity(0.38),
+                        .black.opacity(0.72)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+            } else {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.96, green: 0.98, blue: 1.0),
+                        Color(red: 0.90, green: 0.96, blue: 0.93)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+            }
+        }
+    }
+
     private var idleView: some View {
-        VStack(spacing: 28) {
+        VStack(alignment: .leading, spacing: 20) {
             Spacer()
 
-            Text("🧹")
-                .font(.system(size: 80))
+            VStack(alignment: .leading, spacing: 10) {
+                Text("ピクチャおそうじ")
+                    .font(.system(size: 38, weight: .black, design: .rounded))
+                    .foregroundColor(.white)
 
-            Text("類似写真をスキャンして\nスマホをスッキリ！")
-                .font(.system(size: 20, weight: .semibold))
-                .multilineTextAlignment(.center)
-                .foregroundColor(.primary.opacity(0.7))
+                Text("似ている写真を見つけて、残す1枚を選びやすくします。")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.92))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Label("端末内で写真を解析", systemImage: "lock.shield")
+                Label("信頼度つきで候補を表示", systemImage: "checkmark.seal")
+                Label("削除前に必ず確認", systemImage: "hand.tap")
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(.white.opacity(0.9))
 
             Button {
                 service.startScan()
             } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass")
-                    Text("スキャン開始")
-                        .fontWeight(.bold)
-                }
-                .font(.system(size: 18))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(accentPink)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .shadow(color: accentPink.opacity(0.4), radius: 8, y: 4)
+                Label("スキャン開始", systemImage: "magnifyingglass")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(accentGreen)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .shadow(color: .black.opacity(0.22), radius: 12, y: 8)
             }
-            .padding(.horizontal, 40)
 
-            Text("写真ライブラリをスキャンして\n似ている写真をグループ化します")
+            Text("写真はサーバーへ送りません。似ている候補だけをまとめ、削除は自分で選べます。")
                 .font(.caption)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-
-            Spacer()
+                .foregroundColor(.white.opacity(0.78))
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 28)
     }
 
-    // MARK: - Scanning
     private var scanningView: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 22) {
             Spacer()
 
-            Text("🔍")
-                .font(.system(size: 60))
+            Image(systemName: "photo.stack")
+                .font(.system(size: 54, weight: .semibold))
+                .foregroundColor(accentBlue)
 
-            Text("スキャン中...")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundColor(.primary)
+            Text("写真を確認中")
+                .font(.system(size: 24, weight: .bold, design: .rounded))
 
             ProgressView(value: service.progress)
-                .tint(accentPink)
-                .padding(.horizontal, 50)
+                .tint(accentGreen)
+                .padding(.horizontal, 48)
 
             Text("\(Int(service.progress * 100))%")
                 .font(.system(size: 16, weight: .medium, design: .monospaced))
                 .foregroundColor(.secondary)
 
+            Text("類似候補を探しています。枚数が多いと少し時間がかかります。")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+
             Spacer()
         }
     }
 
-    // MARK: - No results
     private var noResultView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 18) {
             Spacer()
 
-            Text("✨")
-                .font(.system(size: 60))
+            Image(systemName: "sparkles.rectangle.stack")
+                .font(.system(size: 54, weight: .semibold))
+                .foregroundColor(accentGreen)
 
             Text("類似写真は見つかりませんでした")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.primary)
+                .font(.system(size: 20, weight: .bold, design: .rounded))
 
-            Text("写真ライブラリはスッキリです！")
+            Text("写真ライブラリはすっきりしています。")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
 
             Button("もう一度スキャン") {
                 service.startScan()
             }
-            .foregroundColor(accentPink)
-            .padding(.top, 12)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundColor(accentBlue)
+            .padding(.top, 8)
 
             Spacer()
         }
+        .padding(.horizontal, 24)
     }
 
-    // MARK: - Error
-    private func errorView(_ msg: String) -> some View {
+    private func errorView(_ message: String) -> some View {
         VStack(spacing: 16) {
             Spacer()
 
-            Text("⚠️")
-                .font(.system(size: 50))
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 48))
+                .foregroundColor(.orange)
 
-            Text(msg)
+            Text(message)
                 .font(.body)
                 .foregroundColor(.primary)
                 .multilineTextAlignment(.center)
@@ -145,7 +181,8 @@ struct ContentView: View {
             Button("再試行") {
                 service.startScan()
             }
-            .foregroundColor(accentPink)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundColor(accentBlue)
 
             Spacer()
         }

@@ -36,7 +36,7 @@ targets:
         LSRequiresIPhoneOS: true
         LSApplicationCategoryType: public.app-category.photography
         ITSAppUsesNonExemptEncryption: false
-        NSPhotoLibraryUsageDescription: "類似した写真を検出するために写真ライブラリへのアクセスが必要です。"
+        NSPhotoLibraryUsageDescription: "類似写真を探すために写真ライブラリへアクセスします。写真は端末内で処理します。"
         UILaunchScreen:
           UIColorName: ""
         UISupportedInterfaceOrientations:

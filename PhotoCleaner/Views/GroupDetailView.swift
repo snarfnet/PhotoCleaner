@@ -6,7 +6,8 @@ struct GroupDetailView: View {
     @ObservedObject var service: PhotoScanService
     @State private var fullScreenAsset: PHAsset?
 
-    private let accentPink = Color(red: 1.0, green: 0.5, blue: 0.6)
+    private let accentBlue = Color(red: 0.04, green: 0.33, blue: 0.72)
+    private let accentGreen = Color(red: 0.06, green: 0.52, blue: 0.36)
     private let columns = [
         GridItem(.flexible(), spacing: 4),
         GridItem(.flexible(), spacing: 4),
@@ -15,23 +16,30 @@ struct GroupDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            header
+
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 4) {
                     ForEach(group.assets, id: \.localIdentifier) { asset in
                         ZStack(alignment: .topTrailing) {
-                            PhotoThumbnail(asset: asset, size: CGSize(width: 200, height: 200), service: service)
+                            PhotoThumbnail(asset: asset, size: CGSize(width: 220, height: 220), service: service)
                                 .aspectRatio(1, contentMode: .fill)
                                 .clipped()
+                                .overlay(alignment: .topLeading) {
+                                    if asset.localIdentifier == group.recommendedKeepIdentifier {
+                                        keepBadge
+                                            .padding(6)
+                                    }
+                                }
                                 .onTapGesture {
                                     fullScreenAsset = asset
                                 }
 
-                            // Selection checkbox
                             Button {
                                 service.toggleSelection(asset)
                             } label: {
                                 Image(systemName: service.isSelected(asset) ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 24))
+                                    .font(.system(size: 25, weight: .semibold))
                                     .foregroundColor(service.isSelected(asset) ? .red : .white)
                                     .shadow(radius: 2)
                             }
@@ -42,7 +50,6 @@ struct GroupDetailView: View {
                 .padding(4)
             }
 
-            // Bottom bar
             bottomBar
         }
         .navigationTitle("\(group.count)枚の類似写真")
@@ -52,39 +59,69 @@ struct GroupDetailView: View {
         }
     }
 
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                ConfidenceBadge(confidence: group.confidence)
+                Spacer()
+                Text("平均 \(String(format: "%.2f", group.averageDistance)) / 最大 \(String(format: "%.2f", group.maxDistance))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Text(group.confidence.note)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial)
+    }
+
+    private var keepBadge: some View {
+        Label("残す候補", systemImage: "checkmark.seal.fill")
+            .font(.system(size: 11, weight: .bold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(accentGreen)
+            .clipShape(Capsule())
+    }
+
     private var bottomBar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Button {
-                service.selectAllInGroup(group, keepFirst: true)
+                service.selectAllInGroup(group, keepRecommended: true)
             } label: {
-                Text("1枚残して全選択")
+                Label("おすすめ以外", systemImage: "wand.and.stars")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(accentPink)
+                    .background(accentBlue)
                     .clipShape(Capsule())
             }
 
             Button {
-                service.selectAllInGroup(group, keepFirst: false)
+                service.selectAllInGroup(group, keepRecommended: false)
             } label: {
                 Text("全選択")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(accentPink)
-                    .padding(.horizontal, 16)
+                    .foregroundColor(accentBlue)
+                    .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(accentPink.opacity(0.12))
+                    .background(accentBlue.opacity(0.12))
                     .clipShape(Capsule())
             }
 
             Button {
                 service.deselectAllInGroup(group)
             } label: {
-                Text("全解除")
+                Text("解除")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.secondary)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(Color.gray.opacity(0.1))
                     .clipShape(Capsule())
@@ -96,7 +133,6 @@ struct GroupDetailView: View {
     }
 }
 
-// MARK: - Full screen photo viewer
 struct FullPhotoView: View {
     let asset: PHAsset
     @Environment(\.dismiss) private var dismiss
@@ -128,8 +164,8 @@ struct FullPhotoView: View {
             targetSize: CGSize(width: 1200, height: 1200),
             contentMode: .aspectFit,
             options: options
-        ) { img, _ in
-            image = img
+        ) { image, _ in
+            self.image = image
         }
     }
 }

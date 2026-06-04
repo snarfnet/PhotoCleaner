@@ -5,14 +5,13 @@ struct GroupListView: View {
     @State private var showDeleteConfirm = false
     @State private var deleteSuccess: Bool?
 
-    private let accentPink = Color(red: 1.0, green: 0.5, blue: 0.6)
+    private let accentBlue = Color(red: 0.04, green: 0.33, blue: 0.72)
+    private let accentGreen = Color(red: 0.06, green: 0.52, blue: 0.36)
 
     var body: some View {
         VStack(spacing: 0) {
-            // Summary header
             summaryHeader
 
-            // Groups list
             ScrollView {
                 LazyVStack(spacing: 12) {
                     ForEach(service.scanResult?.groups ?? []) { group in
@@ -27,7 +26,6 @@ struct GroupListView: View {
                 .padding(.vertical, 12)
             }
 
-            // Delete button
             if !service.selectedForDeletion.isEmpty {
                 deleteBar
             }
@@ -36,7 +34,15 @@ struct GroupListView: View {
             Button("削除", role: .destructive) { performDelete() }
             Button("キャンセル", role: .cancel) {}
         } message: {
-            Text("\(service.selectedForDeletion.count)枚の写真をゴミ箱に移動します")
+            Text("\(service.selectedForDeletion.count)枚の写真をゴミ箱に移動します。")
+        }
+        .alert("削除に失敗しました", isPresented: Binding(
+            get: { deleteSuccess == false },
+            set: { _ in deleteSuccess = nil }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("写真へのアクセス権限やiCloudの状態を確認してください。")
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -49,23 +55,31 @@ struct GroupListView: View {
     }
 
     private var summaryHeader: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(service.scanResult?.groups.count ?? 0)グループ")
-                    .font(.system(size: 22, weight: .bold))
-                Text("類似写真が見つかりました")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(service.scanResult?.groups.count ?? 0)グループ")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                    Text("類似写真が見つかりました")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("約\(String(format: "%.0f", service.scanResult?.totalSavingsMB ?? 0))MB")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundColor(accentGreen)
+                    Text("整理候補")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 4) {
-                Text("約\(String(format: "%.0f", service.scanResult?.totalSavingsMB ?? 0))MB")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(accentPink)
-                Text("節約できます")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+
+            Label("信頼度が低いグループは自動で決めず、見比べてから選んでください。", systemImage: "eye")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
@@ -76,16 +90,13 @@ struct GroupListView: View {
         Button {
             showDeleteConfirm = true
         } label: {
-            HStack {
-                Image(systemName: "trash")
-                Text("\(service.selectedForDeletion.count)枚を削除")
-                    .fontWeight(.bold)
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(Color.red)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            Label("\(service.selectedForDeletion.count)枚を削除", systemImage: "trash")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.red)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
@@ -100,17 +111,15 @@ struct GroupListView: View {
     }
 }
 
-// MARK: - Group row
 struct GroupRow: View {
     let group: SimilarGroup
     @ObservedObject var service: PhotoScanService
 
     var body: some View {
         HStack(spacing: 12) {
-            // Preview thumbnails (first 3)
             HStack(spacing: -12) {
-                ForEach(0..<min(3, group.assets.count), id: \.self) { i in
-                    PhotoThumbnail(asset: group.assets[i], size: CGSize(width: 50, height: 50), service: service)
+                ForEach(0..<min(3, group.assets.count), id: \.self) { index in
+                    PhotoThumbnail(asset: group.assets[index], size: CGSize(width: 50, height: 50), service: service)
                         .frame(width: 50, height: 50)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .overlay(
@@ -120,18 +129,22 @@ struct GroupRow: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(group.count)枚の類似写真")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.primary)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Text("\(group.count)枚の類似写真")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.primary)
+
+                    ConfidenceBadge(confidence: group.confidence)
+                }
 
                 let selectedInGroup = group.assets.filter { service.isSelected($0) }.count
                 if selectedInGroup > 0 {
-                    Text("\(selectedInGroup)枚選択中")
+                    Text("\(selectedInGroup)枚を選択中")
                         .font(.caption)
                         .foregroundColor(.red)
                 } else {
-                    Text("約\(String(format: "%.0f", group.estimatedSavings))MB節約")
+                    Text("最大距離 \(String(format: "%.2f", group.maxDistance))")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -145,9 +158,31 @@ struct GroupRow: View {
         }
         .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: 10)
                 .fill(.white)
                 .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
         )
+    }
+}
+
+struct ConfidenceBadge: View {
+    let confidence: SimilarityConfidence
+
+    var body: some View {
+        Text(confidence.title)
+            .font(.system(size: 11, weight: .bold))
+            .foregroundColor(color)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.12))
+            .clipShape(Capsule())
+    }
+
+    private var color: Color {
+        switch confidence {
+        case .high: return Color(red: 0.06, green: 0.52, blue: 0.36)
+        case .medium: return Color(red: 0.04, green: 0.33, blue: 0.72)
+        case .needsReview: return .orange
+        }
     }
 }
