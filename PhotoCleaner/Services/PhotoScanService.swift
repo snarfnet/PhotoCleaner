@@ -244,6 +244,22 @@ class PhotoScanService: ObservableObject {
         }
     }
 
+    var safeCandidateCount: Int {
+        guard let groups = scanResult?.groups else { return 0 }
+        return groups.reduce(0) { total, group in
+            guard case .high = group.confidence else { return total }
+            return total + group.assets.filter { $0.localIdentifier != group.recommendedKeepIdentifier }.count
+        }
+    }
+
+    func selectSafeCandidates() {
+        guard let groups = scanResult?.groups else { return }
+        for group in groups {
+            guard case .high = group.confidence else { continue }
+            selectAllInGroup(group, keepRecommended: true)
+        }
+    }
+
     func deselectAllInGroup(_ group: SimilarGroup) {
         for asset in group.assets {
             selectedForDeletion.remove(asset.localIdentifier)

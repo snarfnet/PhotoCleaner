@@ -423,7 +423,22 @@ public class MainActivity extends Activity {
         deleteBar.setPadding(dp(10), dp(8), dp(10), dp(28));
         deleteBar.setBackgroundColor(Color.WHITE);
 
+        int safeCount = safeCandidateCount();
+        if (safeCount > 0) {
+            Button safeSelectButton = secondaryButton("安全候補を一括選択（" + safeCount + "枚）");
+            safeSelectButton.setOnClickListener(v -> {
+                selectSafeCandidates();
+                showResults();
+            });
+            LinearLayout.LayoutParams safeParams = new LinearLayout.LayoutParams(-1, dp(52));
+            safeParams.setMargins(0, 0, 0, dp(8));
+            deleteBar.addView(safeSelectButton, safeParams);
+        }
+
         Button deleteButton = primaryButton("選択した写真を削除");
+        if (!selectedForDeletion.isEmpty()) {
+            deleteButton.setText(selectedForDeletion.size() + "枚を削除");
+        }
         deleteButton.setOnClickListener(v -> requestDeleteSelected());
         deleteBar.addView(deleteButton, new LinearLayout.LayoutParams(-1, dp(52)));
         page.addView(deleteBar);
@@ -471,6 +486,26 @@ public class MainActivity extends Activity {
         params.setMargins(0, 0, 0, dp(12));
         row.setLayoutParams(params);
         return row;
+    }
+
+    private int safeCandidateCount() {
+        int total = 0;
+        for (PhotoGroup group : groups) {
+            if (group.confidenceRank() != 0) continue;
+            for (PhotoItem item : group.items) {
+                if (item != group.recommendedKeep) total++;
+            }
+        }
+        return total;
+    }
+
+    private void selectSafeCandidates() {
+        for (PhotoGroup group : groups) {
+            if (group.confidenceRank() != 0) continue;
+            for (PhotoItem item : group.items) {
+                if (item != group.recommendedKeep) selectedForDeletion.add(item.uri);
+            }
+        }
     }
 
     private void showGroup(PhotoGroup group) {

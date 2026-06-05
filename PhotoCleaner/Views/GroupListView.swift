@@ -26,8 +26,8 @@ struct GroupListView: View {
                 .padding(.vertical, 12)
             }
 
-            if !service.selectedForDeletion.isEmpty {
-                deleteBar
+            if service.safeCandidateCount > 0 || !service.selectedForDeletion.isEmpty {
+                actionBar
             }
         }
         .alert("選択した写真を削除しますか？", isPresented: $showDeleteConfirm) {
@@ -86,17 +86,35 @@ struct GroupListView: View {
         .background(.ultraThinMaterial)
     }
 
-    private var deleteBar: some View {
-        Button {
-            showDeleteConfirm = true
-        } label: {
-            Label("\(service.selectedForDeletion.count)枚を削除", systemImage: "trash")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.red)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+    private var actionBar: some View {
+        VStack(spacing: 10) {
+            if service.safeCandidateCount > 0 {
+                Button {
+                    service.selectSafeCandidates()
+                } label: {
+                    Label("安全候補を一括選択（\(service.safeCandidateCount)枚）", systemImage: "checkmark.seal")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(accentBlue)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(accentBlue.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+            }
+
+            if !service.selectedForDeletion.isEmpty {
+                Button {
+                    showDeleteConfirm = true
+                } label: {
+                    Label("\(service.selectedForDeletion.count)枚を削除", systemImage: "trash")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.red)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 10)
