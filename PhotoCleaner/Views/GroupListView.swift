@@ -99,7 +99,8 @@ struct GroupListView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14))
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 10)
+        .padding(.top, 10)
+        .padding(.bottom, 28)
         .background(.ultraThinMaterial)
     }
 

@@ -4,6 +4,7 @@ import Photos
 struct GroupDetailView: View {
     let group: SimilarGroup
     @ObservedObject var service: PhotoScanService
+    @Environment(\.dismiss) private var dismiss
     @State private var fullScreenAsset: PHAsset?
 
     private let accentBlue = Color(red: 0.04, green: 0.33, blue: 0.72)
@@ -92,6 +93,17 @@ struct GroupDetailView: View {
     private var bottomBar: some View {
         HStack(spacing: 10) {
             Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(accentBlue)
+                    .frame(width: 42, height: 40)
+                    .background(accentBlue.opacity(0.12))
+                    .clipShape(Capsule())
+            }
+
+            Button {
                 service.selectAllInGroup(group, keepRecommended: true)
             } label: {
                 Label("おすすめ以外", systemImage: "wand.and.stars")
@@ -127,7 +139,8 @@ struct GroupDetailView: View {
                     .clipShape(Capsule())
             }
         }
-        .padding(.vertical, 12)
+        .padding(.top, 12)
+        .padding(.bottom, 28)
         .padding(.horizontal, 16)
         .background(.ultraThinMaterial)
     }

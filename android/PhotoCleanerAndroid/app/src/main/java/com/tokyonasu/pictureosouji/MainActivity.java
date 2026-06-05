@@ -404,7 +404,7 @@ public class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
-        list.setPadding(dp(14), dp(12), dp(14), dp(90));
+        list.setPadding(dp(14), dp(12), dp(14), dp(132));
         scroll.addView(list);
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
@@ -418,9 +418,15 @@ public class MainActivity extends Activity {
             }
         }
 
+        LinearLayout deleteBar = new LinearLayout(this);
+        deleteBar.setOrientation(LinearLayout.VERTICAL);
+        deleteBar.setPadding(dp(10), dp(8), dp(10), dp(28));
+        deleteBar.setBackgroundColor(Color.WHITE);
+
         Button deleteButton = primaryButton("選択した写真を削除");
         deleteButton.setOnClickListener(v -> requestDeleteSelected());
-        page.addView(deleteButton, new LinearLayout.LayoutParams(-1, dp(56)));
+        deleteBar.addView(deleteButton, new LinearLayout.LayoutParams(-1, dp(52)));
+        page.addView(deleteBar);
 
         root.addView(page);
     }
@@ -478,12 +484,9 @@ public class MainActivity extends Activity {
         header.setPadding(dp(14), dp(14), dp(14), dp(10));
         header.setBackgroundColor(Color.WHITE);
 
-        Button back = secondaryButton("戻る");
-        back.setOnClickListener(v -> showResults());
         TextView title = text(group.items.size() + "枚の類似写真", 22, Color.rgb(20, 35, 55), true);
         TextView note = text(group.confidenceLabel() + "。残す候補を確認してから選んでください。", 13, Color.DKGRAY, false);
         note.setPadding(0, dp(4), 0, 0);
-        header.addView(back, new LinearLayout.LayoutParams(-1, dp(44)));
         header.addView(title);
         header.addView(note);
         page.addView(header);
@@ -491,7 +494,7 @@ public class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         GridLayout grid = new GridLayout(this);
         grid.setColumnCount(3);
-        grid.setPadding(dp(4), dp(4), dp(4), dp(90));
+        grid.setPadding(dp(4), dp(4), dp(4), dp(132));
         scroll.addView(grid);
 
         int cell = getResources().getDisplayMetrics().widthPixels / 3 - dp(6);
@@ -503,8 +506,11 @@ public class MainActivity extends Activity {
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setPadding(dp(8), dp(8), dp(8), dp(8));
+        actions.setPadding(dp(8), dp(8), dp(8), dp(28));
         actions.setBackgroundColor(Color.WHITE);
+
+        Button back = secondaryButton("戻る");
+        back.setOnClickListener(v -> showResults());
 
         Button selectRecommended = primaryButton("おすすめ以外");
         selectRecommended.setOnClickListener(v -> {
@@ -518,6 +524,7 @@ public class MainActivity extends Activity {
             for (PhotoItem item : group.items) selectedForDeletion.remove(item.uri);
             showGroup(group);
         });
+        actions.addView(back, new LinearLayout.LayoutParams(0, dp(52), 0.78f));
         actions.addView(selectRecommended, new LinearLayout.LayoutParams(0, dp(52), 1));
         actions.addView(clear, new LinearLayout.LayoutParams(0, dp(52), 1));
         page.addView(actions);
