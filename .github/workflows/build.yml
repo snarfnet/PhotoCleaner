@@ -72,7 +72,8 @@ jobs:
         Path("asc_api_key.json").write_text(json.dumps({
             "key_id": "WDXGY9WX55",
             "issuer_id": "2be0734f-943a-4d61-9dc9-5d9045c46fec",
-            "key": key
+            "key": key,
+            "in_house": False
         }))
         PY
 
