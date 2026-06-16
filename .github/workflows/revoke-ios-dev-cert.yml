@@ -1,19 +1,19 @@
-name: Revoke Oldest iOS Development Certificate
+name: Revoke Oldest Apple Development Certificate
 
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: "Type DELETE_OLDEST_IOS_DEVELOPMENT_CERT"
+        description: "Type DELETE_OLDEST_APPLE_DEVELOPMENT_CERT"
         required: true
         type: string
 
 jobs:
   revoke:
-    if: ${{ inputs.confirm == 'DELETE_OLDEST_IOS_DEVELOPMENT_CERT' }}
+    if: ${{ inputs.confirm == 'DELETE_OLDEST_APPLE_DEVELOPMENT_CERT' }}
     runs-on: macos-latest
     steps:
-      - name: Revoke oldest iOS development certificate
+      - name: Revoke oldest Apple development certificate
         env:
           ASC_API_KEY_CONTENT: ${{ secrets.ASC_API_KEY_CONTENT }}
         run: |
@@ -25,6 +25,7 @@ jobs:
           python - <<'PY'
           import json
           import time
+          import urllib.error
           import urllib.request
           from pathlib import Path
 
@@ -55,18 +56,24 @@ jobs:
                   method=method,
                   headers={"Authorization": f"Bearer {token}"},
               )
-              with urllib.request.urlopen(req) as response:
-                  if response.status == 204:
-                      return None
-                  return json.loads(response.read().decode())
+              try:
+                  with urllib.request.urlopen(req) as response:
+                      if response.status == 204:
+                          return None
+                      return json.loads(response.read().decode())
+              except urllib.error.HTTPError as error:
+                  print(error.read().decode())
+                  raise
 
           data = request(
               "GET",
-              "/certificates?filter%5BcertificateType%5D=IOS_DEVELOPMENT&sort=expirationDate&limit=20",
+              "/certificates?filter%5BcertificateType%5D=DEVELOPMENT&limit=50",
           )
           certificates = data.get("data", [])
           if not certificates:
-              raise SystemExit("No iOS Development certificates found.")
+              raise SystemExit("No Apple Development certificates found.")
+
+          certificates.sort(key=lambda cert: cert["attributes"].get("expirationDate", ""))
 
           for cert in certificates:
               attrs = cert["attributes"]
@@ -78,7 +85,7 @@ jobs:
           target = certificates[0]
           attrs = target["attributes"]
           print(
-              f"Revoking oldest iOS Development certificate: "
+              f"Revoking oldest Apple Development certificate: "
               f"id={target['id']} name={attrs.get('name')} expires={attrs.get('expirationDate')}"
           )
           request("DELETE", f"/certificates/{target['id']}")
