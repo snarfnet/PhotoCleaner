@@ -1,0 +1,84 @@
+name: Revoke Oldest iOS Development Certificate
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DELETE_OLDEST_IOS_DEVELOPMENT_CERT"
+        required: true
+        type: string
+
+jobs:
+  revoke:
+    if: ${{ inputs.confirm == 'DELETE_OLDEST_IOS_DEVELOPMENT_CERT' }}
+    runs-on: macos-latest
+    steps:
+      - name: Revoke oldest iOS development certificate
+        env:
+          ASC_API_KEY_CONTENT: ${{ secrets.ASC_API_KEY_CONTENT }}
+        run: |
+          python3 -m pip install --quiet pyjwt cryptography
+          mkdir -p "$RUNNER_TEMP/asc"
+          echo "$ASC_API_KEY_CONTENT" | base64 -D > "$RUNNER_TEMP/asc/AuthKey_WDXGY9WX55.p8"
+          python3 - <<'PY'
+          import json
+          import time
+          import urllib.request
+          from pathlib import Path
+
+          import jwt
+
+          key_id = "WDXGY9WX55"
+          issuer_id = "2be0734f-943a-4d61-9dc9-5d9045c46fec"
+          key = Path.home()
+          key = Path(__import__("os").environ["RUNNER_TEMP"]).joinpath("asc/AuthKey_WDXGY9WX55.p8").read_text()
+
+          token = jwt.encode(
+              {
+                  "iss": issuer_id,
+                  "iat": int(time.time()),
+                  "exp": int(time.time()) + 1200,
+                  "aud": "appstoreconnect-v1",
+              },
+              key,
+              algorithm="ES256",
+              headers={"kid": key_id, "typ": "JWT"},
+          )
+
+          base = "https://api.appstoreconnect.apple.com/v1"
+
+          def request(method, path):
+              req = urllib.request.Request(
+                  base + path,
+                  method=method,
+                  headers={"Authorization": f"Bearer {token}"},
+              )
+              with urllib.request.urlopen(req) as response:
+                  if response.status == 204:
+                      return None
+                  return json.loads(response.read().decode())
+
+          data = request(
+              "GET",
+              "/certificates?filter%5BcertificateType%5D=IOS_DEVELOPMENT&sort=expirationDate&limit=20",
+          )
+          certificates = data.get("data", [])
+          if not certificates:
+              raise SystemExit("No iOS Development certificates found.")
+
+          for cert in certificates:
+              attrs = cert["attributes"]
+              print(
+                  f"found id={cert['id']} name={attrs.get('name')} "
+                  f"serial={attrs.get('serialNumber')} expires={attrs.get('expirationDate')}"
+              )
+
+          target = certificates[0]
+          attrs = target["attributes"]
+          print(
+              f"Revoking oldest iOS Development certificate: "
+              f"id={target['id']} name={attrs.get('name')} expires={attrs.get('expirationDate')}"
+          )
+          request("DELETE", f"/certificates/{target['id']}")
+          print("Revoked.")
+          PY
