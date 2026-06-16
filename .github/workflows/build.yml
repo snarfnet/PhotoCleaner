@@ -43,6 +43,24 @@ jobs:
         mkdir -p ~/.appstoreconnect/private_keys
         echo "$ASC_API_KEY_CONTENT" | base64 -D > ~/.appstoreconnect/private_keys/AuthKey_WDXGY9WX55.p8
 
+    - name: Import distribution certificate
+      env:
+        DIST_CERT_BASE64: ${{ secrets.DIST_CERT_BASE64 }}
+        DIST_CERT_PASSWORD: ${{ secrets.DIST_CERT_PASSWORD }}
+        KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      run: |
+        CERT_PATH="$RUNNER_TEMP/distribution.p12"
+        KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+
+        echo "$DIST_CERT_BASE64" | base64 -D > "$CERT_PATH"
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        security import "$CERT_PATH" -P "$DIST_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+        security list-keychain -d user -s "$KEYCHAIN_PATH"
+        security default-keychain -s "$KEYCHAIN_PATH"
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
     - name: Build Archive
       run: |
         xcodebuild archive \
@@ -51,6 +69,7 @@ jobs:
           -destination "generic/platform=iOS" \
           -archivePath build/PhotoCleaner.xcarchive \
           CODE_SIGN_STYLE=Automatic \
+          CODE_SIGN_IDENTITY="Apple Distribution" \
           DEVELOPMENT_TEAM=83VGKGSQUH \
           -allowProvisioningUpdates \
           -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_WDXGY9WX55.p8 \
